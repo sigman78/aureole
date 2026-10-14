@@ -1,8 +1,9 @@
+import * as THREE from 'three';
 // World-space normals + light/view half vectors produce coherent glints.
 // This is a finite-flake approximation, not a stochastic microfacet BRDF port.
 export const particleVertex = /* glsl */`
   uniform float uTime, uTurbulence, uAssembly, uFocus, uAperture, uRoughness;
-  uniform float uGlint, uPixelRatio, uPalette, uDensity, uPointerStrength;
+  uniform float uGlint, uPixelRatio, uPalette, uDensity, uPointerStrength, uInnerFlow;
   uniform vec3 uWeights, uLight, uPointer;
   uniform sampler2D uSurface;
   uniform float uTriangles;
@@ -66,15 +67,29 @@ export const particleVertex = /* glsl */`
     float release=0.;
     mat3 spin=rotY(t*.055)*rotZ(.1);
     if(uWeights.x>.5){
-    float phase=fract(aSeed.x+t*(0.008+lane*0.00025));
+    // Inner flow: grain speed varies smoothly across each lane, so neighbouring
+    // layers slide past one another as currents inside the overall stream.
+    vec2 offset=vec2((aSeed.z-.5)*.65,(aSeed.w-.5)*.7);
+    float shear=sin(offset.x*11.+offset.y*8.+lane*1.7)*.6+sin(offset.y*17.-offset.x*5.+lane)*.25;
+    float laneSpeed=0.008+lane*0.00025;
+    float speed=laneSpeed*(1.+uInnerFlow*(bokehFlake?0.:shear));
+    float phase=fract(aSeed.x+t*speed);
     float x=(phase-.5)*24.;
     float envelope=0.65+1.4*pow(sin(phase*PI),2.);
-    float angle=phase*10.+lane*.56+t*.09;
-    float width=(aSeed.z-.5)*.65;
-    vec3 flow=vec3(x, sin(x*.4+t*.1)*1.45 + cos(angle)*envelope + width,
-      sin(angle)*envelope*1.35+(aSeed.w-.5)*.7);
+    // The braid's twist and the ribbon's wave both travel downstream at 75% of
+    // the grains' speed: grains mostly ride the shape along the stream, keeping
+    // only a slow residual spiral, instead of churning against a shape that
+    // slid upstream.
+    float drift=t*laneSpeed*.75;
+    float angle=(phase-drift)*10.+lane*.56;
+    vec3 flow=vec3(x, sin((x-drift*24.)*.4)*1.45 + cos(angle)*envelope + offset.x,
+      sin(angle)*envelope*1.35+offset.y);
     flow=rotZ(.21)*flow;
-    flow+=curl(flow*.55+t*.12)*uTurbulence*.55;
+    // Both turbulence scales drift downstream at about the grains' own speed
+    // (~.22 units per time unit), so eddies travel with the stream rather than
+    // standing still or running against it; the fine scale adds local swirls.
+    flow+=curl(flow*.55+vec3(-t*.12,0.,t*.03))*uTurbulence*.55;
+    flow+=curl(flow*1.7+vec3(-t*.37,t*.05,0.))*uInnerFlow*.16;
     // Sparse foreground flakes share the flow but extend well beyond its focus plane.
     if(bokehFlake && aSeed.w>.65) flow.z+=(aSeed.w-.65)*16.;
     p=flow;
@@ -121,6 +136,8 @@ export const particleVertex = /* glsl */`
     float attachedGain=bokehFlake?.10:.06;
     float opticalGain=bokehFlake?mix(3.2,7.,1.-uWeights.y):uDensity*1.4;
     vRadiance*=opticalGain*(uWeights.x*.85+uWeights.y*mix(attachedGain,.65,release)+uWeights.z*.5);
+    // Grains that have settled onto the solid hand over to its glint BRDF.
+    vRadiance*=mix(1.,smoothstep(0.,.25,release),uWeights.y);
     vec4 mv=viewMatrix*world;
     float distanceToCamera=max(-mv.z,.1);
     // Circle-of-confusion diameter in pixels, with energy conserved as it expands.
@@ -128,7 +145,10 @@ export const particleVertex = /* glsl */`
     float coc=abs(distanceToCamera-uFocus)/distanceToCamera*uAperture*70.*uPixelRatio;
     // Only a bounded population gets large aperture splats. Fine grains use
     // a compact footprint and fade out of focus to contain overdraw.
-    float diameter=clamp(sqrt(core*core+coc*coc),1.,bokehFlake?48.:2.5*uPixelRatio);
+    // Sparse flakes skip temporal AA and are very bright, so a ~1 px sprite would
+    // cover 1, 2 or 4 pixels as it moves and its energy would blink, then pulse
+    // through bloom. A 4 px minimum footprint keeps the integrated energy steady.
+    float diameter=clamp(sqrt(core*core+coc*coc),bokehFlake?4.*uPixelRatio:1.,bokehFlake?48.:2.5*uPixelRatio);
     vEnergy=core*core/(diameter*diameter);
     if(!bokehFlake)vEnergy/=1.+coc*.3;
     vBlur=clamp(coc/5.,0.,1.);
@@ -163,24 +183,90 @@ export const finishShader = {
       gl_FragColor=vec4(c,1.);}`
 };
 
+// Stochastic glints for the solid: each pixel's surface patch holds a finite
+// number of mirror facets drawn from the GGX distribution. The count reflecting
+// a finite light into the eye is binomial; dividing by its expectation gives a
+// ratio with mean 1, so the glinty BRDF converges to ordinary GGX as facet
+// density grows. Inspired by Deliot & Belcour 2023 (binomial facet counts over
+// footprint-sized cells and slope bins); simplified, not a port of the paper.
+const glintFunctions = /* glsl */`
+  varying vec3 vLocal, vLocalNormal;
+  uniform float uAssembly, uGlitterDensity, uLightCone, uFocus, uAperture, uPixelRatio;
+  uniform mat3 uObjectFromView;
+  float glintFootprint;
+  float grain(vec3 p){return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453);}
+  uint glintHash(uint x){x^=x>>16;x*=0x7feb352du;x^=x>>15;x*=0x846ca68bu;return x^(x>>16);}
+  float glintRandom(uint x){return float(glintHash(x)>>8)/16777216.;}
+  // Binomial(n,p) by Poisson inversion for small expectations, normal above.
+  float facetCount(float n,float p,uint seed){
+    float mean=n*p,u=glintRandom(seed);
+    if(mean<8.){
+      float term=exp(-mean),cdf=term,k=0.;
+      for(int i=1;i<24;i++){if(u<=cdf)break;k+=1.;term*=mean/k;cdf+=term;}
+      return k;
+    }
+    float z=sqrt(-2.*log(max(u,1e-7)))*cos(6.2831853*glintRandom(seed^0x9e3779b9u));
+    return max(0.,floor(mean+z*sqrt(mean*(1.-p))+.5));
+  }
+  float glintRatio(vec3 l,vec3 v,vec3 n,float roughness){
+    vec3 h=normalize(l+v);
+    float alpha=roughness*roughness,a2=alpha*alpha,nh=max(dot(n,h),0.);
+    float d=nh*nh*(a2-1.)+1.,ndf=a2/(PI*d*d);
+    // Fraction of projected facet area whose normals reflect the light's cone to the eye.
+    float halfSolid=PI*uLightCone*uLightCone/(4.*max(dot(h,l),.01));
+    float p=clamp(ndf*nh*halfSolid,0.,1.);
+    // Slope bins in a surface-attached frame: facets stay put as the dragon turns.
+    vec3 no=normalize(vLocalNormal),hn=uObjectFromView*h;
+    float s=no.z>=0.?1.:-1.,a=-1./(s+no.z),b=no.x*no.y*a;
+    vec3 tangent=vec3(1.+s*no.x*no.x*a,s*b,-s*no.x),bitangent=vec3(b,s+no.y*no.y*a,-no.y);
+    vec2 slope=vec2(dot(hn,tangent),dot(hn,bitangent))/max(dot(hn,no),.05)/uLightCone-.5;
+    ivec2 bin=ivec2(floor(slope));vec2 binT=slope-floor(slope);
+    // Cells about half a pixel wide, blended trilinearly in space and bilinearly
+    // in slope so counts change continuously under motion and sub-pixel jitter;
+    // two levels blend as the footprint changes.
+    float lod=log2(max(glintFootprint*.5,1e-6)/1e-4),level0=floor(lod),ratio=0.;
+    for(int k=0;k<2;k++){
+      float level=level0+float(k),size=1e-4*exp2(level),facets=uGlitterDensity*size*size;
+      vec3 g=vLocal/size-.5,cellT=g-floor(g);
+      ivec3 base=ivec3(floor(g));
+      float count=0.;
+      for(int i=0;i<8;i++){
+        ivec3 corner=ivec3(i&1,(i>>1)&1,i>>2);uvec3 c=uvec3(base+corner);
+        vec3 wc=mix(1.-cellT,cellT,vec3(corner));
+        uint cell=glintHash(c.x*73856093u^c.y*19349663u^c.z*83492791u^uint(int(level)+64)*2654435761u);
+        for(int j=0;j<4;j++){
+          ivec2 o=ivec2(j&1,j>>1);uvec2 sb=uvec2(bin+o);
+          vec2 w=mix(1.-binT,binT,vec2(o));
+          count+=wc.x*wc.y*wc.z*w.x*w.y*facetCount(facets,p,glintHash(cell^sb.x*2246822519u^sb.y*3266489917u));
+        }
+      }
+      ratio+=count/max(facets*p,1e-9)*(k==0?1.-(lod-level0):lod-level0);
+    }
+    return min(ratio,4000.);
+  }
+`;
+
 // Surface dissolve uses the same x distribution as particles' sampled positions.
 export function patchMetal(material, uniforms) {
   material.onBeforeCompile = shader => {
-    shader.uniforms.uAssembly=uniforms.uAssembly;
-    shader.uniforms.uGlint=uniforms.uGlint;
-    shader.vertexShader=shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vLocal;');
-    shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvLocal=position;');
-    shader.fragmentShader=shader.fragmentShader.replace('#include <common>', `#include <common>
-      varying vec3 vLocal; uniform float uAssembly,uGlint;
-      float grain(vec3 p){return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453);}`);
+    Object.assign(shader.uniforms,{uAssembly:uniforms.uAssembly,uGlitterDensity:uniforms.uGlitterDensity,
+      uLightCone:uniforms.uLightCone,uObjectFromView:uniforms.uObjectFromView,
+      uFocus:uniforms.uFocus,uAperture:uniforms.uAperture,uPixelRatio:uniforms.uPixelRatio});
+    shader.vertexShader=shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vLocal, vLocalNormal;');
+    shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvLocal=position;vLocalNormal=normal;');
+    shader.fragmentShader=shader.fragmentShader.replace('#include <common>', '#include <common>\n'+glintFunctions);
     shader.fragmentShader=shader.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
       float boundary=(vLocal.x+3.6)/7.2;
-      if(boundary>uAssembly+grain(floor(vLocal*45.))*.09-.045) discard;`);
-    // Fine deterministic roughness variation modulates the actual PBR reflection.
-    shader.fragmentShader=shader.fragmentShader.replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-      float footprint=max(length(fwidth(vLocal))*90.,1.);
-      float fleck=grain(floor(vLocal*90.));
-      roughnessFactor=clamp(roughnessFactor+(fleck-.5)*.3/footprint,.12,.75);`);
+      if(boundary>uAssembly+grain(floor(vLocal*45.))*.09-.045) discard;
+      // A defocused pixel integrates the surface over its circle of confusion,
+      // so glints converge there instead of blurring single hot facets.
+      float glintCoc=abs(vViewPosition.z-uFocus)/vViewPosition.z*uAperture*70.*uPixelRatio;
+      glintFootprint=length(fwidth(vLocal))*clamp(glintCoc,1.,24.*uPixelRatio);`);
+    const direct='vec3 specularBRDF = BRDF_GGX( directLight.direction, geometryViewDir, geometryNormal, material );';
+    if(!THREE.ShaderChunk.lights_physical_pars_fragment.includes(direct))throw new Error('Unexpected three.js lighting chunk; glint patch needs updating.');
+    shader.fragmentShader=shader.fragmentShader.replace('#include <lights_physical_pars_fragment>',
+      THREE.ShaderChunk.lights_physical_pars_fragment.replace(direct,
+        direct+'\n\tspecularBRDF *= glintRatio( directLight.direction, geometryViewDir, geometryNormal, material.roughness );'));
   };
-  material.customProgramCacheKey=()=> 'aureole-metal-v1';
+  material.customProgramCacheKey=()=> 'aureole-metal-glint-v2';
 }

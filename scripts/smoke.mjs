@@ -31,7 +31,7 @@ try {
     await page.waitForFunction(i=>window.aureole.state.scene===i&&window.aureole.state.transition===1,i);
     await page.waitForTimeout(1800);
     const s=await snapshot();assert.equal(s.scene,i);assert(s.frames>0);
-    assert.equal(s.count,1200000);assert.equal(s.drawnParticles,s.count,'Actual point draw matches selected density');assert.equal(s.particleAttributeBytes,0,'Particles generated on GPU without per-particle buffers');
+    assert.equal(s.count,2400000);assert.equal(s.drawnParticles,s.count,'Actual point draw matches selected density');assert.equal(s.particleAttributeBytes,0,'Particles generated on GPU without per-particle buffers');
     profiles.push({scene:i,fps:s.fps,count:s.count,gpuMs:s.gpuMs});
     await page.screenshot({path:`artifacts/desktop-${i}.png`});
   }
@@ -43,11 +43,11 @@ try {
   assert((await snapshot()).camera.every((v,i)=>Math.abs(v-frozenCamera[i])<1e-8),'Pause holds the camera shot');
   await page.locator('#open-settings').click();
   await page.locator('#camera-motion').uncheck();assert.equal((await snapshot()).cameraMotion,false);
-  for(const [id,value] of Object.entries({bloom:.4,exposure:1.3,focus:.8,focal:12,roughness:.5,glint:2.3,light:5,turbulence:1,speed:.4,assembly:.3})){
+  for(const [id,value] of Object.entries({bloom:.4,exposure:1.3,focus:.8,focal:12,roughness:.5,glint:2.3,light:5,turbulence:1,speed:.4,assembly:.3,glitter:7,innerFlow:1.2})){
     await slider(id,value);assert.equal((await snapshot())[id],value);
   }
   await page.locator('#palette').selectOption('2');assert.equal((await snapshot()).palette,2);
-  for(const count of [120000,600000,2400000,1200000]){
+  for(const count of [240000,1200000,4800000,2400000]){
     await page.locator('#quality').selectOption(String(count));
     await page.waitForFunction(count=>window.aureole.state.drawnParticles===count,count);
     assert.equal((await snapshot()).count,count);
@@ -92,7 +92,7 @@ try {
 
   const quiet=await browser.newPage({viewport:{width:390,height:844},reducedMotion:'reduce'});
   await quiet.goto('http://127.0.0.1:5174');await quiet.waitForFunction(()=>window.aureole?.state.ready);
-  assert(await quiet.evaluate(()=>window.aureole.state.paused&&!window.aureole.state.cameraMotion&&window.aureole.state.count===600000),'Mobile starts in balanced detail and honors reduced motion');
+  assert(await quiet.evaluate(()=>window.aureole.state.paused&&!window.aureole.state.cameraMotion&&window.aureole.state.count===1200000),'Mobile starts in balanced detail and honors reduced motion');
   await quiet.evaluate(()=>document.querySelector('canvas').getContext('webgl2').getExtension('WEBGL_lose_context').loseContext());
   await quiet.getByText('The light needs a little help.').waitFor();
   await quiet.close();
