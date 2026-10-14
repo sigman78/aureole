@@ -2,7 +2,7 @@
 
 ## Status
 
-First runnable version implemented with Three.js/WebGL 2, three procedural scenes, GLSL particle motion and glints, HDR bloom, particle bokeh, locally served fonts, live controls and browser smoke tests. See README.md for launch instructions and limitations. Three generated scene comps and exact prompt sidecars are in the project root: `01-current.png`, `02-relic.png`, and `03-continuum.png`. Impeccable is explicitly excluded from further work; its local metadata is ignored by Git and imposes no approval gates.
+First runnable version implemented with Three.js/WebGL 2, three procedural scenes, GLSL particle motion and glints, HDR bloom, particle bokeh, locally served fonts, live controls and browser smoke tests. See README.md for launch instructions and limitations. Three generated scene comps and exact prompt sidecars are retained locally and excluded from Git: `01-current.png`, `02-relic.png`, and `03-continuum.png`. Impeccable is explicitly excluded from further work; its local metadata is ignored by Git and imposes no approval gates.
 
 ## Reference observations
 
@@ -47,4 +47,4 @@ Temporal AA uses 16-sample Halton jitter, HDR-compressed neighborhood variance c
 
 ## Comps and provenance
 
-Generated with the built-in Imagegen tool. Exact prompts are preserved in each `.png.json` sidecar. These are design targets, not captured runtime images or performance evidence. The artwork must be rendered interactively; do not ship the comps as canvas backgrounds.
+Generated with the built-in Imagegen tool. Exact prompts are preserved in local `.png.json` sidecars; neither comps nor sidecars are included in the published repository. These are design targets, not captured runtime images or performance evidence. The artwork must be rendered interactively; do not ship the comps as canvas backgrounds.

@@ -2,7 +2,7 @@
 
 **Real-time studies in particle light — 1.2 million GPU-generated grains, HDR glitter, bloom and depth of field.**
 
-Three interactive studies in particle light, inspired by the supplied Foundation opening references. Built with plain JavaScript, Three.js, custom GLSL and Vite. All artwork is rendered live; generated comps are reference images only.
+Three interactive studies in particle light, inspired by the supplied Foundation opening references. Built with plain JavaScript, Three.js, custom GLSL and Vite. All artwork is rendered live; the screenshots below show actual demo output.
 
 ![Aureole Current scene: flowing gold, crimson and jade particles with bright glints and defocused bokeh](docs/screenshots/current.png)
 

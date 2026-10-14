@@ -2,7 +2,7 @@
 
 ## Objective
 
-Build a JavaScript / Three.js WebGL showcase inspired by five local reference screenshots (excluded from the repository), using the three generated root-level comps as visual targets. No Impeccable workflow. No WebGPU dependency for the initial version.
+Build a JavaScript / Three.js WebGL showcase inspired by five local reference screenshots (excluded from the repository), using the three locally retained generated comps as visual targets (also excluded from the repository). No Impeccable workflow. No WebGPU dependency for the initial version.
 
 ## 1. Establish the rendering pipeline
 

@@ -5,3 +5,9 @@ dist/
 artifacts/
 .cache/
 ref/
+/01-current.png
+/01-current.png.json
+/02-relic.png
+/02-relic.png.json
+/03-continuum.png
+/03-continuum.png.json
