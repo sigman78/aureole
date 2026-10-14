@@ -8,7 +8,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { loadSculpture, surfaceAtlas, makeParticles } from './geometry.js';
-import { particleVertex, particleFragment, finishShader, patchMetal } from './shaders.js';
+import { particleVertex, particleFragment, finishShader, patchMetal, dissolveShadowMaterial } from './shaders.js';
 import { GpuTimer } from './gpu-timer.js';
 import { DepthOfFieldPass } from './depth-of-field.js';
 import { CameraMotion } from './camera-motion.js';
@@ -51,6 +51,7 @@ async function setup() {
   renderer.setPixelRatio(Math.min(devicePixelRatio,mobile?1.25:1.65));
   renderer.setSize(innerWidth,innerHeight);
   gpuTimer=new GpuTimer(renderer.getContext());
+  renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure=state.exposure;
   renderer.setClearColor(0x000000);
@@ -70,6 +71,10 @@ async function setup() {
   scene.add(new THREE.HemisphereLight(0xd3e6d9,0x3e1706,1));
   const key=new THREE.PointLight(0xffcf89,400,40,2);key.position.set(-4,6,5);key.name='key';scene.add(key);
   const rim=new THREE.PointLight(0x74e3c4,200,35,2);rim.position.set(5,2,-4);scene.add(rim);
+  // The rim light grazes the dragon from behind; without self-shadowing its
+  // glints light coils and limbs that the body itself hides from it.
+  rim.castShadow=true;rim.shadow.mapSize.set(1024,1024);rim.shadow.camera.near=1;rim.shadow.camera.far=20;
+  rim.shadow.bias=-.002;rim.shadow.normalBias=.03;rim.shadow.radius=3;
   sculpture=await loadSculpture();atlas=surfaceAtlas(sculpture);
   uniforms={
     uTime:{value:0},uTurbulence:{value:state.turbulence},uAssembly:{value:state.assembly},
@@ -90,6 +95,7 @@ async function setup() {
   const metalMaterial=new THREE.MeshStandardMaterial({color:0xbfa16a,metalness:1,roughness:.48,envMap:environment.texture,envMapIntensity:.03});
   patchMetal(metalMaterial,uniforms);
   metal=new THREE.Mesh(sculpture,metalMaterial);metal.visible=false;scene.add(metal);
+  metal.castShadow=metal.receiveShadow=true;metal.customDistanceMaterial=dissolveShadowMaterial(uniforms);
   const objectFromView=new THREE.Matrix4();
   metal.onBeforeRender=(renderer,scene,view)=>{
     objectFromView.multiplyMatrices(view.matrixWorldInverse,metal.matrixWorld);
