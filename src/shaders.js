@@ -247,6 +247,10 @@ const glintFunctions = /* glsl */`
 `;
 
 // Surface dissolve uses the same x distribution as particles' sampled positions.
+const dissolve=`
+      float boundary=(vLocal.x+3.6)/7.2;
+      if(boundary>uAssembly+grain(floor(vLocal*45.))*.09-.045) discard;`;
+
 export function patchMetal(material, uniforms) {
   material.onBeforeCompile = shader => {
     Object.assign(shader.uniforms,{uAssembly:uniforms.uAssembly,uGlitterDensity:uniforms.uGlitterDensity,
@@ -255,9 +259,7 @@ export function patchMetal(material, uniforms) {
     shader.vertexShader=shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vLocal, vLocalNormal;');
     shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvLocal=position;vLocalNormal=normal;');
     shader.fragmentShader=shader.fragmentShader.replace('#include <common>', '#include <common>\n'+glintFunctions);
-    shader.fragmentShader=shader.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>
-      float boundary=(vLocal.x+3.6)/7.2;
-      if(boundary>uAssembly+grain(floor(vLocal*45.))*.09-.045) discard;
+    shader.fragmentShader=shader.fragmentShader.replace('#include <clipping_planes_fragment>', `#include <clipping_planes_fragment>${dissolve}
       // A defocused pixel integrates the surface over its circle of confusion,
       // so glints converge there instead of blurring single hot facets.
       float glintCoc=abs(vViewPosition.z-uFocus)/vViewPosition.z*uAperture*70.*uPixelRatio;
@@ -269,4 +271,20 @@ export function patchMetal(material, uniforms) {
         direct+'\n\tspecularBRDF *= glintRatio( directLight.direction, geometryViewDir, geometryNormal, material.roughness );'));
   };
   material.customProgramCacheKey=()=> 'aureole-metal-glint-v2';
+}
+
+// Shadow-map material for the solid: dissolved regions must not cast shadows.
+export function dissolveShadowMaterial(uniforms) {
+  const material=new THREE.MeshDistanceMaterial();
+  material.onBeforeCompile = shader => {
+    shader.uniforms.uAssembly=uniforms.uAssembly;
+    shader.vertexShader=shader.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vLocal;');
+    shader.vertexShader=shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvLocal=position;');
+    shader.fragmentShader=shader.fragmentShader.replace('#include <common>', `#include <common>
+      varying vec3 vLocal; uniform float uAssembly;
+      float grain(vec3 p){return fract(sin(dot(p,vec3(127.1,311.7,74.7)))*43758.5453);}`);
+    shader.fragmentShader=shader.fragmentShader.replace('#include <clipping_planes_fragment>', '#include <clipping_planes_fragment>'+dissolve);
+  };
+  material.customProgramCacheKey=()=> 'aureole-dissolve-distance-v1';
+  return material;
 }
