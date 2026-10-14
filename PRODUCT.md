@@ -9,4 +9,4 @@ Three scenes: flowing particles, solid/particle interaction, and geometric fract
 ## Stack
 Confirmed by user: vanilla JavaScript, Three.js and Vite. No deployment target specified.
 ## Evidence
-Five user-provided JPG references in ref/. They guide materials and atmosphere, not a pixel-identical recreation.
+Five user-provided JPG references, retained locally and excluded from the repository. They guide materials and atmosphere, not a pixel-identical recreation.
