@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#090b0d" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="description" content="Three real-time studies in light, matter, and motion. An interactive cinematic particle experiment." />
+    <title>Aureole — studies in particle light</title>
+  </head>
+  <body>
+    <canvas id="stage" aria-label="Interactive three-dimensional particle artwork. Drag to orbit, scroll to zoom." role="img"></canvas>
+    <div id="loading" role="status">Gathering light…</div>
+    <main id="interface">
+      <header>
+        <a class="wordmark" href="#" aria-label="Aureole home">aureole<span class="brand-orbit" aria-hidden="true"></span></a>
+        <span class="header-note">Studies in light & matter</span>
+        <div class="header-actions">
+          <button id="cinema" class="text-button" title="Hide interface (H)">Cinema view <span>H</span></button>
+          <button id="fullscreen" class="icon-button" aria-label="Enter fullscreen" title="Fullscreen"><svg viewBox="0 0 24 24"><path d="M8 3H3v5m13-5h5v5M3 16v5h5m13-5v5h-5"/></svg></button>
+        </div>
+      </header>
+      <section class="scene-caption" aria-live="polite">
+        <h1 id="scene-title">The current</h1>
+        <p id="scene-description">A river of light, finding its own way.</p>
+      </section>
+      <aside id="settings" aria-label="Rendering controls">
+        <div class="panel-heading"><h2>Light & motion</h2><button id="close-settings" class="icon-button" aria-label="Close controls"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
+        <div class="control"><label for="bloom">Bloom <output id="bloom-value">0.85</output></label><input id="bloom" type="range" min="0" max="2" step="0.01" value="0.85" /></div>
+        <div class="control"><label for="exposure">Exposure <output id="exposure-value">1.10</output></label><input id="exposure" type="range" min="0.3" max="2.5" step="0.01" value="1.1" /></div>
+        <div class="control"><label for="focus">Depth of field <output id="focus-value">0.45</output></label><input id="focus" type="range" min="0" max="1" step="0.01" value="0.45" /></div>
+        <div class="control"><label for="focal">Focus distance <output id="focal-value">16.00</output></label><input id="focal" type="range" min="6" max="30" step="0.1" value="16" /></div>
+        <div class="control"><label for="roughness">Flake roughness <output id="roughness-value">0.28</output></label><input id="roughness" type="range" min="0.12" max="0.7" step="0.01" value="0.28" /></div>
+        <div class="control"><label for="glint">Glint strength <output id="glint-value">1.40</output></label><input id="glint" type="range" min="0" max="4" step="0.01" value="1.4" /></div>
+        <div class="control"><label for="light">Key light position <output id="light-value">-4.00</output></label><input id="light" type="range" min="-10" max="10" step="0.1" value="-4" /></div>
+        <div class="control"><label for="turbulence">Turbulence <output id="turbulence-value">0.55</output></label><input id="turbulence" type="range" min="0" max="1.5" step="0.01" value="0.55" /></div>
+        <div class="control"><label for="speed">Time scale <output id="speed-value">0.60</output></label><input id="speed" type="range" min="0" max="2" step="0.01" value="0.6" /></div>
+        <label class="toggle-row" for="camera-motion">Camera drift <input id="camera-motion" type="checkbox" checked /></label>
+        <label class="toggle-row" for="antialias">Temporal antialiasing <input id="antialias" type="checkbox" checked /></label>
+        <div class="control"><label for="stabilization">Grain stabilization <output id="stabilization-value">0.75</output></label><input id="stabilization" type="range" min="0" max="0.95" step="0.01" value="0.75" /></div>
+        <div class="control" id="assembly-control"><label for="assembly">Assembly <output id="assembly-value">0.82</output></label><input id="assembly" type="range" min="0" max="1" step="0.01" value="0.82" /></div>
+        <button id="assemble" class="reset-button">Disperse particles</button>
+        <div class="select-row"><label for="palette">Palette</label><select id="palette"><option value="0">Ember & jade</option><option value="1">Pale gold</option><option value="2">Glacial silver</option></select></div>
+        <div class="select-row"><label for="quality">Detail</label><select id="quality"><option value="120000">Reference · 120k</option><option value="600000">Balanced · 600k</option><option value="1200000" selected>High · 1.2M</option><option value="2400000">Ultra · 2.4M</option></select></div>
+        <button id="reset" class="reset-button">Reset this study</button>
+        <p class="panel-footnote">Move through the field to disturb it.<br>Drag to orbit. Scroll to move closer.</p>
+      </aside>
+      <footer>
+        <div class="scene-navigation" role="group" aria-label="Choose a particle scene">
+          <button class="scene-button active" data-scene="0" aria-pressed="true"><span class="scene-number">01</span><span>Current</span><span class="scene-subtitle">Flow field</span></button>
+          <button class="scene-button" data-scene="1" aria-pressed="false"><span class="scene-number">02</span><span>Relic</span><span class="scene-subtitle">Matter & form</span></button>
+          <button class="scene-button" data-scene="2" aria-pressed="false"><span class="scene-number">03</span><span>Continuum</span><span class="scene-subtitle">Recursive lattice</span></button>
+        </div>
+        <div class="playback">
+          <button id="pause" class="icon-button" aria-label="Pause animation" title="Pause (Space)"><svg viewBox="0 0 24 24"><path d="M9 5v14M15 5v14"/></svg></button>
+          <button id="tour" class="text-button" aria-pressed="false" title="Cycle through the three studies">Auto journey</button>
+          <span class="divider"></span>
+          <button id="open-settings" class="icon-button" aria-label="Open rendering controls" aria-expanded="false" title="Light & motion"><svg viewBox="0 0 24 24"><path d="M4 7h7m5 0h4M4 17h3m5 0h8"/><circle cx="13.5" cy="7" r="2.5"/><circle cx="9.5" cy="17" r="2.5"/></svg></button>
+          <button id="capture" class="icon-button" aria-label="Save artwork as PNG" title="Save frame"><svg viewBox="0 0 24 24"><path d="M8 5 9.5 3h5L16 5h4v15H4V5Z"/><circle cx="12" cy="12" r="4"/></svg></button>
+        </div>
+        <div class="bottom-line"><span>AN EXPERIMENT IN PARTICLE LIGHT</span><span id="hint">Move to disturb · Drag to orbit</span><span id="stats">WEBGL 2</span></div>
+      </footer>
+    </main>
+    <button id="restore" class="text-button" hidden>Show controls <span>H</span></button>
+    <div id="notice" role="status"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
