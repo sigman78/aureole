@@ -3,7 +3,7 @@ import './style.css';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { StableBloomPass } from './stable-bloom.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
@@ -18,8 +18,8 @@ import { SparklePass } from './sparkle-pass.js';
 const $ = id => document.getElementById(id);
 const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)');
 const mobile = matchMedia('(max-width: 800px)').matches;
-const defaults = { stabilization:.65, bloom:1.05, exposure:1.3, focus:.7, turbulence:.55, speed:.6, assembly:.82, roughness:.28, glint:2.2, light:-4, focal:15 };
-const state = { ...defaults, antialias:true, cameraMotion:!reducedMotion.matches, scene:0, time:0, paused:reducedMotion.matches, tour:false, palette:0, count:mobile?600000:1200000, drawnParticles:0, gpuMs:null, frames:0, fps:0, transition:1, target:0, assemblyTarget:null, ready:false };
+const defaults = { stabilization:.65, bloom:1.4, exposure:1.3, focus:.7, turbulence:.55, speed:.6, assembly:.82, roughness:.28, glint:2.2, light:-4, focal:15, glitter:6, innerFlow:.7 };
+const state = { ...defaults, antialias:true, cameraMotion:!reducedMotion.matches, scene:0, time:0, paused:reducedMotion.matches, tour:false, palette:0, count:mobile?1200000:2400000, drawnParticles:0, gpuMs:null, frames:0, fps:0, transition:1, target:0, assemblyTarget:null, ready:false };
 const titles = ['The current','The relic','Continuum'];
 const descriptions = ['A river of light, finding its own way.','Between what remains and what becomes.','A simple rule. An infinite becoming.'];
 let renderer, composer, controls, scene, camera, points, metal, bloom, finish, uniforms, sculpture, environment;
@@ -68,15 +68,15 @@ async function setup() {
   environment=pmrem.fromScene(room,.04);scene.environment=environment.texture;
   room.dispose();pmrem.dispose();
   scene.add(new THREE.HemisphereLight(0xd3e6d9,0x3e1706,1));
-  const key=new THREE.PointLight(0xffcf89,18,40,2);key.position.set(-4,6,5);key.name='key';scene.add(key);
-  const rim=new THREE.PointLight(0x74e3c4,12,35,2);rim.position.set(5,2,-4);scene.add(rim);
+  const key=new THREE.PointLight(0xffcf89,400,40,2);key.position.set(-4,6,5);key.name='key';scene.add(key);
+  const rim=new THREE.PointLight(0x74e3c4,200,35,2);rim.position.set(5,2,-4);scene.add(rim);
   sculpture=await loadSculpture();atlas=surfaceAtlas(sculpture);
   uniforms={
     uTime:{value:0},uTurbulence:{value:state.turbulence},uAssembly:{value:state.assembly},
     uFocus:{value:state.focal},uAperture:{value:state.focus},uRoughness:{value:state.roughness},
     uGlint:{value:state.glint},uPixelRatio:{value:renderer.getPixelRatio()},uPalette:{value:0},
-    uDensity:{value:Math.pow(120000/state.count,.55)},uPointerStrength:{value:0},uWeights:{value:new THREE.Vector3(1,0,0)},
-    uLight:{value:key.position},uPointer:{value:pointerTarget.clone()},uSurface:{value:atlas.texture},uTriangles:{value:atlas.count}
+    uDensity:{value:Math.pow(120000/state.count,.55)},uPointerStrength:{value:0},uInnerFlow:{value:defaults.innerFlow},uWeights:{value:new THREE.Vector3(1,0,0)},
+    uLight:{value:key.position},uGlitterDensity:{value:Math.pow(10,defaults.glitter)},uLightCone:{value:.03},uObjectFromView:{value:new THREE.Matrix3()},uPointer:{value:pointerTarget.clone()},uSurface:{value:atlas.texture},uTriangles:{value:atlas.count}
   };
   const material=new THREE.ShaderMaterial({uniforms,vertexShader:particleVertex,fragmentShader:particleFragment,
     transparent:true,depthWrite:false,depthTest:true,blending:THREE.AdditiveBlending});
@@ -85,15 +85,22 @@ async function setup() {
   let drawnGrains=0;
   points.onAfterRender=()=>{drawnGrains=renderer.info.render.points;};
   sparkles.onAfterRender=()=>{state.drawnParticles=drawnGrains+renderer.info.render.points;};
-  const metalMaterial=new THREE.MeshStandardMaterial({color:0xbfa16a,metalness:1,roughness:.48,envMapIntensity:.08});
+  // An explicit envMap makes envMapIntensity apply; scene.environment would use
+  // scene.environmentIntensity and drown the glinting direct light in smooth IBL.
+  const metalMaterial=new THREE.MeshStandardMaterial({color:0xbfa16a,metalness:1,roughness:.48,envMap:environment.texture,envMapIntensity:.03});
   patchMetal(metalMaterial,uniforms);
   metal=new THREE.Mesh(sculpture,metalMaterial);metal.visible=false;scene.add(metal);
+  const objectFromView=new THREE.Matrix4();
+  metal.onBeforeRender=(renderer,scene,view)=>{
+    objectFromView.multiplyMatrices(view.matrixWorldInverse,metal.matrixWorld);
+    uniforms.uObjectFromView.value.setFromMatrix4(objectFromView).transpose();
+  };
   composer=new EffectComposer(renderer);
   const depthPass=new DepthOfFieldPass(scene,camera,points,metal,state);
   composer.addPass(depthPass);
   temporalAA=new TemporalAAPass(camera,depthPass,state);composer.addPass(temporalAA);
   composer.addPass(new SparklePass(scene,camera,points,sparkles,metal));
-  bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),state.bloom,.38,1.1);composer.addPass(bloom);
+  bloom=new StableBloomPass(new THREE.Vector2(innerWidth,innerHeight),state.bloom,.45,.9);bloom.halo=5;composer.addPass(bloom);
   finish=new ShaderPass(finishShader);composer.addPass(finish);composer.addPass(new OutputPass());
   $('quality').value=String(state.count);
   bindControls();resize();updatePause();updateSceneLabels();
@@ -144,6 +151,8 @@ function setSetting(name,value) {
   if(!uniforms)return;
   const mapping={focus:'uAperture',focal:'uFocus',roughness:'uRoughness',glint:'uGlint',assembly:'uAssembly',turbulence:'uTurbulence'};
   if(mapping[name])uniforms[mapping[name]].value=value;
+  if(name==='glitter')uniforms.uGlitterDensity.value=Math.pow(10,value);
+  if(name==='innerFlow')uniforms.uInnerFlow.value=value;
   if(name==='bloom')bloom.strength=value;
   if(name==='exposure')renderer.toneMappingExposure=value;
   if(name==='light')scene.getObjectByName('key').position.x=value;
@@ -190,7 +199,7 @@ function bindControls() {
     state.count=Number(event.target.value);
     points.geometry.setDrawRange(12000,state.count-12000);
     uniforms.uDensity.value=Math.pow(120000/state.count,.55);
-    const ratio=Math.min(devicePixelRatio,state.count<=600000?1.25:1.65);
+    const ratio=Math.min(devicePixelRatio,state.count<=1200000?1.25:1.65);
     renderer.setPixelRatio(ratio);composer.setPixelRatio(ratio);uniforms.uPixelRatio.value=ratio;resize();
   };
   $('reset').onclick=()=>{
@@ -264,6 +273,7 @@ function frame(now) {
   if(now-statsTime>1000){state.fps=Math.round(frameCount*1000/(now-statsTime));const countLabel=state.count>=1000000?`${(state.count/1000000).toFixed(1)}M`:`${Math.round(state.count/1000)}K`;$('stats').textContent=`${countLabel} PARTICLES · ${state.fps} FPS`;$('stats').title=state.gpuMs===null?'GPU timing unavailable':`GPU frame: ${state.gpuMs.toFixed(2)} ms (rolling median)`;frameCount=0;statsTime=now;}
 }
 
-// Read-only diagnostic snapshot for reproducible browser checks and profiling.
-window.aureole={get state(){return {...state,surfaceAtlasBytes:atlas?.bytes,modelTriangles:atlas?.count,particleAttributeBytes:points?Object.values(points.geometry.attributes).reduce((sum,attribute)=>sum+attribute.array.byteLength,0):null,weights:uniforms?.uWeights.value.toArray(),camera:camera?.position.toArray(),renderer:renderer?.getContext().getParameter(renderer.getContext().VERSION)};}};
+// Diagnostic snapshot for reproducible browser checks and profiling;
+// step() advances paused simulation time by exact frames for temporal measurements.
+window.aureole={step:frames=>{state.time+=frames/60*state.speed;},get state(){return {...state,surfaceAtlasBytes:atlas?.bytes,modelTriangles:atlas?.count,particleAttributeBytes:points?Object.values(points.geometry.attributes).reduce((sum,attribute)=>sum+attribute.array.byteLength,0):null,weights:uniforms?.uWeights.value.toArray(),camera:camera?.position.toArray(),renderer:renderer?.getContext().getParameter(renderer.getContext().VERSION)};}};
 setup().catch(error=>{console.error(error);fatal(error.message||'WebGL could not start. Try enabling hardware acceleration in your browser.');});

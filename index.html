@@ -26,13 +26,15 @@
       </section>
       <aside id="settings" aria-label="Rendering controls">
         <div class="panel-heading"><h2>Light & motion</h2><button id="close-settings" class="icon-button" aria-label="Close controls"><svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18"/></svg></button></div>
-        <div class="control"><label for="bloom">Bloom <output id="bloom-value">0.85</output></label><input id="bloom" type="range" min="0" max="2" step="0.01" value="0.85" /></div>
+        <div class="control"><label for="bloom">Bloom <output id="bloom-value">1.40</output></label><input id="bloom" type="range" min="0" max="3" step="0.01" value="1.4" /></div>
         <div class="control"><label for="exposure">Exposure <output id="exposure-value">1.10</output></label><input id="exposure" type="range" min="0.3" max="2.5" step="0.01" value="1.1" /></div>
         <div class="control"><label for="focus">Depth of field <output id="focus-value">0.45</output></label><input id="focus" type="range" min="0" max="1" step="0.01" value="0.45" /></div>
         <div class="control"><label for="focal">Focus distance <output id="focal-value">16.00</output></label><input id="focal" type="range" min="6" max="30" step="0.1" value="16" /></div>
         <div class="control"><label for="roughness">Flake roughness <output id="roughness-value">0.28</output></label><input id="roughness" type="range" min="0.12" max="0.7" step="0.01" value="0.28" /></div>
+        <div class="control"><label for="glitter">Glitter density (log) <output id="glitter-value">6.00</output></label><input id="glitter" type="range" min="3" max="9" step="0.05" value="6" /></div>
         <div class="control"><label for="glint">Glint strength <output id="glint-value">1.40</output></label><input id="glint" type="range" min="0" max="4" step="0.01" value="1.4" /></div>
         <div class="control"><label for="light">Key light position <output id="light-value">-4.00</output></label><input id="light" type="range" min="-10" max="10" step="0.1" value="-4" /></div>
+        <div class="control"><label for="innerFlow">Inner flow <output id="innerFlow-value">0.70</output></label><input id="innerFlow" type="range" min="0" max="1.5" step="0.01" value="0.7" /></div>
         <div class="control"><label for="turbulence">Turbulence <output id="turbulence-value">0.55</output></label><input id="turbulence" type="range" min="0" max="1.5" step="0.01" value="0.55" /></div>
         <div class="control"><label for="speed">Time scale <output id="speed-value">0.60</output></label><input id="speed" type="range" min="0" max="2" step="0.01" value="0.6" /></div>
         <label class="toggle-row" for="camera-motion">Camera drift <input id="camera-motion" type="checkbox" checked /></label>
@@ -41,7 +43,7 @@
         <div class="control" id="assembly-control"><label for="assembly">Assembly <output id="assembly-value">0.82</output></label><input id="assembly" type="range" min="0" max="1" step="0.01" value="0.82" /></div>
         <button id="assemble" class="reset-button">Disperse particles</button>
         <div class="select-row"><label for="palette">Palette</label><select id="palette"><option value="0">Ember & jade</option><option value="1">Pale gold</option><option value="2">Glacial silver</option></select></div>
-        <div class="select-row"><label for="quality">Detail</label><select id="quality"><option value="120000">Reference · 120k</option><option value="600000">Balanced · 600k</option><option value="1200000" selected>High · 1.2M</option><option value="2400000">Ultra · 2.4M</option></select></div>
+        <div class="select-row"><label for="quality">Detail</label><select id="quality"><option value="240000">Reference · 240k</option><option value="1200000">Balanced · 1.2M</option><option value="2400000" selected>High · 2.4M</option><option value="4800000">Ultra · 4.8M</option></select></div>
         <button id="reset" class="reset-button">Reset this study</button>
         <p class="panel-footnote">Move through the field to disturb it.<br>Drag to orbit. Scroll to move closer.</p>
       </aside>

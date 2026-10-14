@@ -1,6 +1,6 @@
 # Aureole
 
-**Real-time studies in particle light — 1.2 million GPU-generated grains, HDR glitter, bloom and depth of field.**
+**Real-time studies in particle light — 2.4 million GPU-generated grains, HDR glitter, bloom and depth of field.**
 
 Three interactive studies in particle light, inspired by the supplied Foundation opening references. Built with plain JavaScript, Three.js, custom GLSL and Vite. All artwork is rendered live; the screenshots below show actual demo output.
 
@@ -44,15 +44,15 @@ The smoke test starts its own Vite server on port 5174 and reuses installed Micr
 
 Drag to orbit; scroll or pinch to zoom; move the pointer through the field to disturb it. Use **1 / 2 / 3** to select scenes, **Space** to pause, **H** to hide/show the interface, and **Escape** to close controls or leave cinema view. Native focused buttons retain their Space-key behavior.
 
-The sliders control grain stabilization, bloom, exposure, depth softness, focus distance, flake roughness, glint strength, key-light position, turbulence, time scale and assembly. Assembly is available in Relic and Continuum. The assemble/disperse button animates the transition while running and applies immediately while paused. Automatic journey cycles scenes every 22 seconds. Save frame exports the artwork without interface chrome.
+The sliders control grain stabilization, bloom, exposure, depth softness, focus distance, flake roughness, glint strength, Relic glitter density, Current inner flow, key-light position, turbulence, time scale and assembly. Assembly is available in Relic and Continuum. The assemble/disperse button animates the transition while running and applies immediately while paused. Automatic journey cycles scenes every 22 seconds. Save frame exports the artwork without interface chrome.
 
-Reduced-motion preferences start the animation paused. Hidden tabs stop rendering. Detail levels use 120k / 600k / 1.2M / 2.4M particles, with 1.2M selected on desktop and 600k on smaller screens; resolution is capped separately to contain fill cost. Optional cinematic camera drift yields to orbit interaction and freezes when paused.
+Reduced-motion preferences start the animation paused. Hidden tabs stop rendering. Detail levels use 240k / 1.2M / 2.4M / 4.8M particles, with 2.4M selected on desktop and 1.2M on smaller screens; resolution is capped separately to contain fill cost. Optional cinematic camera drift yields to orbit interaction and freezes when paused.
 
 ## What is physically motivated
 
-Particles keep deterministic facet orientations. A GGX-shaped distribution, a Fresnel approximation and the light/view half vector produce angle-dependent glints. Bright values remain in linear half-float buffers through bloom, then pass through ACES tone mapping and sRGB conversion once. Depth-dependent particle splats conserve integrated profile energy as they expand into bokeh.
+Particles keep deterministic facet orientations. A GGX-shaped distribution, a Fresnel approximation and the light/view half vector produce angle-dependent glints. Bright values remain in linear half-float buffers through a temporally stable bloom (filtered 13-tap downsampling instead of UnrealBloomPass, which made moving hot flakes pulse), then pass through ACES tone mapping and sRGB conversion once. Depth-dependent particle splats conserve integrated profile energy as they expand into bokeh.
 
-This is an artistic finite-flake approximation, not a complete physically based glitter BRDF. Extreme impulses are capped to reduce aliasing; particle light response lacks full transport and shadowing. The solid uses Three.js metallic PBR with an environment map and key/rim lights. Particle occlusion respects its depth, but defocused splats can still bleed at silhouettes. The solid receives depth-texture-based HDR blur; particles use energy-normalized aperture splats. Dense grains use temporal accumulation, while 12,000 sparse optical flakes are drawn afterward to preserve sparkle. Temporal reprojection approximates particle depth with the focus plane and has no per-particle motion vectors, so residual shimmer and motion artifacts remain possible. History resets during assembly changes. Flow and pointer response are analytic GPU deformations, not a fluid or collision simulation.
+This is an artistic finite-flake approximation, not a complete physically based glitter BRDF. Extreme impulses are capped to reduce aliasing; particle light response lacks full transport and shadowing. The solid uses Three.js metallic PBR with a faint environment map and key/rim lights, whose direct specular is replaced by a stochastic glint BRDF: a finite number of facets per surface patch, binomially sampled, converging to ordinary GGX as glitter density rises. It is a simplified form of Deliot & Belcour 2023, not a port; see RENDERING.md. Particle occlusion respects its depth, but defocused splats can still bleed at silhouettes. The solid receives depth-texture-based HDR blur; particles use energy-normalized aperture splats. Dense grains use temporal accumulation, while 12,000 sparse optical flakes are drawn afterward to preserve sparkle. Temporal reprojection approximates particle depth with the focus plane and has no per-particle motion vectors, so residual shimmer and motion artifacts remain possible. History resets during assembly changes. Flow and pointer response are analytic GPU deformations, not a fluid or collision simulation.
 
 ## Validation
 
@@ -60,7 +60,7 @@ The smoke suite checks all scenes, simulation pause, scene changes while paused,
 
 ## GPU particle generation
 
-The desktop default now draws 1.2 million particles. Seeds, positions, motion and lighting are computed from `gl_VertexID`, with no per-particle attribute buffers. An area-weighted triangle atlas samples the dragon surface on the GPU. Fine grains use compact splats; a fixed 12,000-flake population gets larger bokeh footprints to bound fill cost. This is analytic animation, not persistent fluid simulation.
+The desktop default now draws 2.4 million particles. Seeds, positions, motion and lighting are computed from `gl_VertexID`, with no per-particle attribute buffers. An area-weighted triangle atlas samples the dragon surface on the GPU. Fine grains use compact splats; a fixed 12,000-flake population gets larger bokeh footprints to bound fill cost. This is analytic animation, not persistent fluid simulation.
 
 ## Model attribution
 
